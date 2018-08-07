@@ -1,0 +1,7 @@
+META-INF/
+.settings/
+target/
+.svn/
+
+.DS_Store
+desktop.ini
