@@ -2,11 +2,11 @@
 A Servlet dispatcher just like HttpServlet but supports JAX-RS style path routing.
 
 ## Why tinyrs?
-+ HttpServlet-like request dispatching and JAX-RS-like path routing
-+ Easy to get(if you are familiar with Servlet and JAX-RS) and easy to carry(small in jar size)
-+ [HTTP-RPC](https://github.com/gk-brown/HTTP-RPC) is not light-weight enough, so this is.
++ tinyrs uses  HttpServlet-like request dispatching and JAX-RS-like path routing
++ tinyrs is tandard-ready, easy to learn and small in size
++ Similar library like [HTTP-RPC](https://github.com/gk-brown/HTTP-RPC) is just not light-weight enough, so tinyrs may be more.
 
-If need a balanced solution between feature-rich web framework and small-beautiful Servlet, tinyrs is right choice.
+If you need a balanced solution between feature-rich web framework and small-beautiful Servlet, tinyrs is the right choice.
 
 ## Install
 1. Checkout the tinyrs project
@@ -24,8 +24,8 @@ If need a balanced solution between feature-rich web framework and small-beautif
 1. Create a servlet class which will extend TinyrsDispatcherServlet
 2. Register the servlet through deployment descriptor(web.xml) or annotation(@WebServlet) like /appPath/*
 3. Add a `public void` method with parameters `(HttpServletRequest request, HttpServletResponse response)`
-4. Add one or more http method annotations(@GET,@POST,@PUT,@PATCH,@DELETE,@OPTIONS,@HEAD), and optional @Path, @Produces, @Consumes
-5. Add logic code in method, just do as doGet() doPost() doDelete() in HttpServlet do
+4. Add one or more http method annotations(@GET,@POST,@PUT,@PATCH,@DELETE,@OPTIONS,@HEAD), and rest optional @Path, @Produces, @Consumes
+5. Fill logic code in the method, just like doGet(), doPost(), ..., the HttpServlet way
 
 Here is a example:
 
@@ -36,7 +36,7 @@ public class GreetingServlet extends TinyrsDispatcherServlet {
 
 	@GET
 	@Path("/hello")
-	@Produces("application/json")
+	@Produces("text/plain")
 	public void sayHello(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
 		try( PrintWriter out=response.getWriter() ){
 			out.write("Hello");
