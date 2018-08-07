@@ -21,9 +21,12 @@ import javax.servlet.annotation.WebServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.Part;
+import javax.ws.rs.Consumes;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
+import javax.ws.rs.Produces;
+import javax.ws.rs.core.MediaType;
 
 import net.bldgos.tinyrs.TinyrsDispatcherServlet;
 
@@ -41,12 +44,25 @@ public class V1Servlet extends TinyrsDispatcherServlet {
 
 	@GET
 	@Path("/")
-	public void getWelcomeFile(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
-		request.getRequestDispatcher("/v1/index.jsp").forward(request, response);
+	@Produces(MediaType.TEXT_HTML)
+	public void getWelcomePage(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+		request.getRequestDispatcher("/WEB-INF/v1/index.jsp").forward(request, response);
+	}
+
+	@POST
+	@Path("/")
+	@Produces(MediaType.TEXT_HTML)
+	public void postWelcomeINfo(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+		String message=request.getParameter("message");
+		try(PrintWriter out=response.getWriter();){
+			out.println(message);
+		}
 	}
 
 	@POST
 	@Path("/login")
+	@Consumes(MediaType.APPLICATION_FORM_URLENCODED)
+	@Produces(MediaType.TEXT_PLAIN)
 	public void login(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
 		String username=request.getParameter("username");
 		String password=request.getParameter("password");
@@ -81,11 +97,9 @@ public class V1Servlet extends TinyrsDispatcherServlet {
 	
 	@POST
 	@Path("/upload")
+	@Consumes(MediaType.MULTIPART_FORM_DATA)
+	@Produces(MediaType.TEXT_PLAIN)
 	public void upload(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
-		if(!request.getContentType().startsWith("multipart/form-data")) {
-			response.sendError(HttpServletResponse.SC_NOT_ACCEPTABLE);
-			return;
-		}
 		int count=0;
 		for(Part part:request.getParts()) {
 			String fileName=part.getSubmittedFileName();
@@ -95,6 +109,7 @@ public class V1Servlet extends TinyrsDispatcherServlet {
 			File destFile=new File(repoDir,fileName);
 			try(InputStream input=part.getInputStream()){
 				Files.copy(input, destFile.toPath(),StandardCopyOption.REPLACE_EXISTING);
+				count++;
 			}finally {
 				part.delete();
 			}
@@ -106,6 +121,7 @@ public class V1Servlet extends TinyrsDispatcherServlet {
 
 	@GET
 	@Path("/download")
+	@Produces(MediaType.APPLICATION_OCTET_STREAM)
 	public void download(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
 		String repoRelativePath=request.getParameter("path");
 		if(repoRelativePath==null) {

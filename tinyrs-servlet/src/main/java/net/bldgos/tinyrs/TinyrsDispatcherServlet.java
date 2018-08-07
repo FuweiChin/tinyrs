@@ -6,6 +6,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -29,11 +30,13 @@ import javax.ws.rs.POST;
 import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
+import javax.ws.rs.core.MediaType;
 
 public abstract class TinyrsDispatcherServlet extends GenericServlet {
 	private static final long serialVersionUID = 3072968609000472207L;
 	private static Logger LOGGER=Logger.getLogger(TinyrsDispatcherServlet.class.getName());
 	private Map<String,List<ResourceMethod>> resourceMapping=new LinkedHashMap<>();
+	private List<String> UNSAFE_METHODS=Arrays.asList("POST","PUT","PATCH","DELETE");
 	@Override
 	public void init() throws ServletException {
 		WebServlet webServletAnno=this.getClass().getAnnotation(WebServlet.class);
@@ -87,8 +90,6 @@ public abstract class TinyrsDispatcherServlet extends GenericServlet {
 				throw new ServletException("resource method should have 2 parameters (HttpServletRequest,HttpServletResponse)");
 			}
 			resourceMethod.setReflectedMethod(method);
-			String httpMethod=httpMethodAnnotations.get(0).annotationType().getAnnotation(HttpMethod.class).value();
-			resourceMethod.setHttpMethod(httpMethod);
 			//if annotated @Path present, its @Path value should start with /
 			Path pathAnno=method.getAnnotation(Path.class);
 			String path;
@@ -110,11 +111,19 @@ public abstract class TinyrsDispatcherServlet extends GenericServlet {
 				group=new ArrayList<>();
 				resourceMapping.put(path, group);
 			}
-			//path+httpMethod should be unique in a Servlet
-			if(group.indexOf(resourceMethod)!=-1) {
-				throw new ServletException("A method with same HTTP method and path already exists");
+			for(int i=0; i<httpMethodAnnotations.size(); i++) {
+				resourceMethod.setHttpMethod(httpMethodAnnotations.get(i).annotationType().getAnnotation(HttpMethod.class).value());
+				//path+httpMethod should be unique in a Servlet
+				if(group.indexOf(resourceMethod)!=-1) {
+					throw new ServletException("A method with same HTTP method and path already exists");
+				}
+				ResourceMethod rm=null;
+				try {
+					rm = (ResourceMethod) resourceMethod.clone();
+				} catch (CloneNotSupportedException e) {
+				}
+				group.add(rm);
 			}
-			group.add(resourceMethod);
 		}
 		LOGGER.info("tinyrs resouce servlet "+this.getClass().getName()+" initialized");
 	}
@@ -129,21 +138,46 @@ public abstract class TinyrsDispatcherServlet extends GenericServlet {
 			response.sendError(HttpServletResponse.SC_NOT_FOUND);
 			return;
 		}
-		ResourceMethod resourceMethod=null;
 		List<ResourceMethod> group=resourceMapping.get(pathInfo);
 		if(group==null) {
 			response.sendError(HttpServletResponse.SC_NOT_FOUND);
 			return;
 		}
-		resourceMethod=new ResourceMethod();
-		resourceMethod.setHttpMethod(request.getMethod());
-		resourceMethod.setPath(pathInfo);
-		int index=group.indexOf(resourceMethod);
+		ResourceMethod rm=new ResourceMethod();
+		rm.setHttpMethod(request.getMethod());
+		rm.setPath(pathInfo);
+		int index=group.indexOf(rm);
 		if(index==-1) {
-			response.sendError(HttpServletResponse.SC_NOT_FOUND);
+			response.sendError(HttpServletResponse.SC_METHOD_NOT_ALLOWED);
 			return;
 		}
-		resourceMethod=group.get(index);
+		ResourceMethod resourceMethod=group.get(index);
+		// #2 validating phase
+		List<MediaType> produceTypes=resourceMethod.getProduceTypes();
+		if(produceTypes!=null) {
+			List<MediaType> acceptTypes=parseAccept(request.getHeader("Accept"));
+			boolean accepted=produceTypes.stream().anyMatch((produceType)->{
+				return acceptTypes.stream().anyMatch((acceptType)->acceptType.isCompatible(produceType));
+			});
+			if(!accepted) {
+				response.sendError(HttpServletResponse.SC_NOT_ACCEPTABLE);
+				return;
+			}
+		}
+		if(UNSAFE_METHODS.contains(request.getMethod())) {
+			List<MediaType> consumeTypes=resourceMethod.getConsumeTypes();
+			String contentType=request.getHeader("Content-Type");
+			if(consumeTypes!=null&&contentType!=null) {
+				boolean accepted=consumeTypes.stream().anyMatch((consumeType)->{
+					return consumeType.isCompatible(MediaType.valueOf(contentType));
+				});
+				if(!accepted) {
+					response.sendError(HttpServletResponse.SC_NOT_ACCEPTABLE);
+					return;
+				}
+			}
+		}
+		// #3 dispatching phase
 		String[] produces=resourceMethod.getProduces();
 		if(produces!=null&&produces.length==1) {//send response header Content-Type only when producing one MediaType
 			response.setHeader("Content-Type", produces[0]);
@@ -159,6 +193,13 @@ public abstract class TinyrsDispatcherServlet extends GenericServlet {
 			e.printStackTrace();
 		}
 	}
+	private static List<MediaType> parseAccept(String accept){
+		List<MediaType> types=new ArrayList<>();
+		for(String type:accept.split(", ?")) {
+			types.add(MediaType.valueOf(type));
+		}
+		return types;
+	}
 }
 
 class ResourceMethod {
@@ -167,6 +208,20 @@ class ResourceMethod {
 	private String path;
 	private String[] consumes;
 	private String[] produces;
+	private transient List<MediaType> consumeTypes;
+	private transient List<MediaType> produceTypes;
+	
+	public ResourceMethod() {
+		
+	}
+	public ResourceMethod(Method reflectedMethod, String httpMethod, String path, String[] consumes, String[] produces) {
+		this.reflectedMethod = reflectedMethod;
+		this.httpMethod = httpMethod;
+		this.path = path;
+		this.consumes = consumes;
+		this.produces = produces;
+	}
+	
 	public Method getReflectedMethod() {
 		return reflectedMethod;
 	}
@@ -197,6 +252,42 @@ class ResourceMethod {
 	public void setProduces(String[] produces) {
 		this.produces = produces;
 	}
+	public List<MediaType> getConsumeTypes() {
+		if(consumes==null)
+			return null;
+		List<MediaType> mediaTypes=consumeTypes;
+		if(mediaTypes!=null)
+			return mediaTypes;
+		synchronized (consumes) {
+			mediaTypes=consumeTypes;
+			if(mediaTypes!=null)
+				return mediaTypes;
+			mediaTypes=new ArrayList<>();
+			for(String consume:consumes) {
+				mediaTypes.add(MediaType.valueOf(consume));
+			}
+			this.consumeTypes=mediaTypes;
+			return mediaTypes;
+		}
+	}
+	public List<MediaType> getProduceTypes() {
+		if(produces==null)
+			return null;
+		List<MediaType> mediaTypes=produceTypes;
+		if(mediaTypes!=null)
+			return mediaTypes;
+		synchronized (produces) {
+			mediaTypes=produceTypes;
+			if(mediaTypes!=null)
+				return mediaTypes;
+			mediaTypes=new ArrayList<>();
+			for(String consume:produces) {
+				mediaTypes.add(MediaType.valueOf(consume));
+			}
+			this.produceTypes=mediaTypes;
+			return mediaTypes;
+		}
+	}
 	@Override
 	public boolean equals(Object obj) {
 		if(obj instanceof ResourceMethod) {
@@ -209,5 +300,9 @@ class ResourceMethod {
 	@Override
 	public int hashCode() {
 		return this.path.hashCode()+this.httpMethod.hashCode();
+	}
+	@Override
+	protected Object clone() throws CloneNotSupportedException {
+		return new ResourceMethod(reflectedMethod, httpMethod, path, consumes, produces);
 	}
 }
