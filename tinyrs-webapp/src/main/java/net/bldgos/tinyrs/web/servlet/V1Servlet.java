@@ -23,6 +23,7 @@ import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.Part;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.GET;
+import javax.ws.rs.PATCH;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
@@ -116,6 +117,17 @@ public class V1Servlet extends TinyrsDispatcherServlet {
 		}
 		try(PrintWriter out=response.getWriter();){
 			out.write(count+" files uploaded");
+		}
+	}
+
+	@PATCH
+	@Path("/upload")
+	@Consumes(MediaType.APPLICATION_OCTET_STREAM)
+	@Produces(MediaType.TEXT_PLAIN)
+	public void patch(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+		//TODO
+		try(PrintWriter out=response.getWriter();){
+			out.write("file patched");
 		}
 	}
 
