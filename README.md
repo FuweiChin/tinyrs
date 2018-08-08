@@ -2,21 +2,21 @@
 A Servlet dispatcher just like HttpServlet but supports JAX-RS style path routing.
 
 ## Why tinyrs?
-+ tinyrs uses  HttpServlet-like request dispatching and JAX-RS-like path routing
++ tinyrs uses HttpServlet-like request dispatching and JAX-RS-like path routing
 + tinyrs is tandard-ready, easy to learn and small in size
-+ Similar library like [HTTP-RPC](https://github.com/gk-brown/HTTP-RPC) is just not light-weight enough, so tinyrs may be more.
++ Similar library like [HTTP-RPC](https://github.com/gk-brown/HTTP-RPC) is just not light-weight enough, so tinyrs may be more
 
 If you need a balanced solution between feature-rich web framework and small-beautiful Servlet, tinyrs is the right choice.
 
 ## Install
-1. Checkout the tinyrs project
-2. Include the following dependency to your maven pom.xml
+1. Checkout this [tinyrs](https://github.com/FuweiChin/tinyrs) repository and run `mvn install` under proejct tinyrs-servlet
+2. Include the following dependency to your maven project's pom.xml
 
 ```
 <dependency>
 	<groupId>net.bldgos</groupId>
 	<artifactId>tinyrs-servlet</artifactId>
-	<version>0.1.0</version>
+	<version>0.3.0</version>
 </dependency>
 ```
 
