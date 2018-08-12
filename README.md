@@ -27,7 +27,7 @@ If you need a balanced solution between feature-rich web framework and small-bea
 4. Add one or more http method annotations(@GET,@POST,@PUT,@PATCH,@DELETE,@OPTIONS,@HEAD), and rest optional @Path, @Produces, @Consumes
 5. Fill logic code in the method, just like doGet(), doPost(), ..., the HttpServlet way
 
-Here is a example:
+Here is an example:
 
 ```
 @WebServlet(urlPatterns="/v1/*")
